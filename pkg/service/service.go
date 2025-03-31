@@ -5,9 +5,10 @@ import (
 	"github.com/Timon2632/todo-app/pkg/repositoty"
 )
 
-type Authorzation interface {
+type Authorization interface {
 	CreateUser(user todo.User) (int, error)
 	GenerateToken(username, password string) (string, error)
+	ParseToken(token string) (int, error)
 }
 
 type TodoList interface {
@@ -17,13 +18,13 @@ type TodoItem interface {
 }
 
 type Service struct {
-	Authorzation
+	Authorization
 	TodoList
 	TodoItem
 }
 
 func NewService(repos *repositoty.Repositoty) *Service {
 	return &Service{
-		Authorzation: NewAuthServise(repos.Authorzation),
+		Authorization: NewAuthServise(repos.Authorzation),
 	}
 }

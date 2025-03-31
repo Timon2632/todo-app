@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 
 const (
 	salt       = "ahrghagfesf1243124wqadwafd"
-	singingKey = "wqfewgrreq12`41512%@!112ewtewqw"
+	signingKey = "wqfewgrreq12`41512%@!112ewtewqw"
 	tokenTTL   = 12 * time.Hour
 )
 
@@ -21,20 +22,20 @@ type tokenClaims struct {
 	UserId int `json:"user_id"`
 }
 
-type AuthServise struct {
+type AuthService struct {
 	repo repositoty.Authorzation
 }
 
-func NewAuthServise(repo repositoty.Authorzation) *AuthServise {
-	return &AuthServise{repo: repo}
+func NewAuthServise(repo repositoty.Authorzation) *AuthService {
+	return &AuthService{repo: repo}
 }
 
-func (s *AuthServise) CreateUser(user todo.User) (int, error) {
-	user.Password = generatePasswordHash(user.Password)
+func (s *AuthService) CreateUser(user todo.User) (int, error) {
+	user.PasswordHash = generatePasswordHash(user.PasswordHash)
 	return s.repo.CreateUser(user)
 }
 
-func (s *AuthServise) GenerateToken(username, password string) (string, error) {
+func (s *AuthService) GenerateToken(username, password string) (string, error) {
 	user, err := s.repo.GetUser(username, generatePasswordHash(password))
 	if err != nil {
 		return "", err
@@ -47,7 +48,28 @@ func (s *AuthServise) GenerateToken(username, password string) (string, error) {
 		},
 		user.Id,
 	})
-	return token.SignedString([]byte(singingKey))
+	return token.SignedString([]byte(signingKey))
+}
+
+// AuthService
+func (s *AuthService) ParseToken(accessToken string) (int, error) {
+	token, err := jwt.ParseWithClaims(accessToken, &tokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("invalid signing method")
+		}
+
+		return []byte(signingKey), nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	claims, ok := token.Claims.(*tokenClaims)
+	if !ok {
+		return 0, errors.New("token claims are not of type *tokenClaims")
+	}
+
+	return claims.UserId, nil
 }
 
 func generatePasswordHash(password string) string {
